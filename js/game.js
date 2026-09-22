@@ -4,6 +4,7 @@ class Level {
     this.mapDef = mapDef;
     this.groundY = mapDef.groundY;
     this.pits = [];
+    this.craters = []; // shallow cosmetic dents left by the ultimate - safe to stand on, unlike pits
     this.platforms = [];
     this.terrain = [];
     this.nextChunkIndex = 0;
@@ -28,12 +29,13 @@ class Level {
     return this.pits.some((p) => x > p[0] && x < p[1]);
   }
 
-  // The Kirby-devours-the-ground ultimate: carves a gap into the ground just ahead of (x, facing)
-  // and sweeps up any nearby terrain items as a bonus. Returns the consumed items for scoring.
+  // The Kirby-devours-the-ground ultimate: leaves a shallow crater just ahead of (x, facing) -
+  // a cosmetic dent, not a real pit, so using it never drops Kirby through the ground - and
+  // sweeps up any nearby terrain items as a bonus. Returns the consumed items for scoring.
   carveGround(x, facing) {
     const width = 170 + Math.random() * 40;
     const startX = facing >= 0 ? x + 30 : x - 30 - width;
-    this.pits.push([startX, startX + width]);
+    this.craters.push([startX, startX + width]);
     const consumed = [];
     for (const item of this.terrain) {
       if (item.eaten) continue;
@@ -153,6 +155,27 @@ class Level {
       ctx.fillRect(sx, p.y, p.w, 18);
       ctx.fillStyle = theme.ground;
       ctx.fillRect(sx, p.y, p.w, 6);
+    }
+
+    // ultimate craters - a shallow dent drawn into the ground surface, fully walkable
+    for (const c of this.craters) {
+      const cx = (c[0] + c[1]) / 2 - camX;
+      const w = c[1] - c[0];
+      if (cx + w / 2 < 0 || cx - w / 2 > canvasW) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(c[0] - camX, this.groundY - 2, w, 40);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(cx, this.groundY + 6, w / 2, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(cx, this.groundY + 2, w / 2 - 6, 10, 0, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
