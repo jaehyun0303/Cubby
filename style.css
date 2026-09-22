@@ -400,6 +400,56 @@ html, body {
   touch-action: none;
 }
 
+.seasoning-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 20px;
+  background: rgba(20, 10, 0, 0.35);
+}
+.seasoning-controls.hidden { display: none; }
+
+.seasoning-label {
+  margin: 0;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.92);
+  color: var(--pink-deep);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.seasoning-gauge {
+  position: relative;
+  width: min(92%, 380px);
+  height: 34px;
+  background: rgba(255,255,255,0.35);
+  border-radius: 17px;
+  overflow: hidden;
+  border: 3px solid #fff;
+}
+.seasoning-zone {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 38%;
+  width: 24%;
+  background: rgba(120, 230, 140, 0.55);
+}
+.seasoning-marker {
+  position: absolute;
+  top: -6px; bottom: -6px;
+  left: 0%;
+  width: 10px;
+  border-radius: 6px;
+  background: #ff5f3f;
+  box-shadow: 0 0 8px rgba(255,95,63,0.8);
+  transform: translateX(-50%);
+}
+
 /* ---------- Mobile touch controls ---------- */
 .touch-controls {
   position: absolute;

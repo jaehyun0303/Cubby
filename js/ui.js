@@ -260,6 +260,61 @@ const UI = (() => {
     });
   }
 
+  // A single-tap timing minigame for seasoning: a marker sweeps left/right across a gauge and the
+  // player taps (button, or Z/Enter) to "add" it - accuracy is how close to dead center they landed.
+  function runSeasoningMinigame(label, maxTimeMs) {
+    return new Promise((resolve) => {
+      const controls = el('seasoning-controls');
+      const marker = el('seasoning-marker');
+      const btn = el('seasoning-btn');
+      const labelEl = el('seasoning-label');
+      labelEl.textContent = label;
+      controls.classList.remove('hidden');
+
+      let locked = false;
+      let pos = 0;
+      let dir = 1;
+      let elapsedMs = 0;
+      let lastTs = null;
+      const speed = 145; // %/s sweep rate
+
+      function frame(ts) {
+        if (locked) return;
+        if (lastTs === null) lastTs = ts;
+        const dt = Math.min((ts - lastTs) / 1000, 1 / 30);
+        lastTs = ts;
+        elapsedMs += dt * 1000;
+
+        pos += dir * speed * dt;
+        if (pos >= 100) { pos = 100; dir = -1; }
+        if (pos <= 0) { pos = 0; dir = 1; }
+        marker.style.left = `${pos}%`;
+
+        if (elapsedMs >= maxTimeMs) { finish(); return; }
+        requestAnimationFrame(frame);
+      }
+
+      function finish() {
+        if (locked) return;
+        locked = true;
+        controls.classList.add('hidden');
+        btn.removeEventListener('pointerdown', onTap);
+        window.removeEventListener('keydown', onKey);
+        const distFromCenter = Math.abs(pos - 50);
+        resolve(Math.max(0, 1 - distFromCenter / 42));
+      }
+
+      function onTap(e) { e.preventDefault(); finish(); }
+      function onKey(e) {
+        if (e.code === 'KeyZ' || e.code === 'Enter' || e.code === 'KeyJ') { e.preventDefault(); finish(); }
+      }
+
+      btn.addEventListener('pointerdown', onTap);
+      window.addEventListener('keydown', onKey);
+      requestAnimationFrame(frame);
+    });
+  }
+
   async function runCookingScenes(baseResult) {
     const img = el('cooking-image');
     const caption = el('cooking-caption');
@@ -267,6 +322,7 @@ const UI = (() => {
     const flash = el('slice-flash-overlay');
     const heatControls = el('cooking-heat-controls');
     heatControls.classList.add('hidden');
+    el('seasoning-controls').classList.add('hidden');
 
     img.src = 'assets/cooking/board.jpg';
     caption.textContent = '앗, 시간 종료! 화면을 사선으로 쓱 밀어서 커비를 썰어보세요!';
@@ -283,22 +339,40 @@ const UI = (() => {
     await wait(1200);
 
     img.src = 'assets/cooking/pan.jpg';
-    caption.textContent = '불 조절이 맛을 좌우한다! 초록 구간을 유지하세요';
+
+    caption.textContent = '1차 불 조절! 초록 구간을 유지하세요';
     heatControls.classList.remove('hidden');
-    const accuracy = await runHeatMinigame(9000);
+    const heat1 = await runHeatMinigame(4000);
     heatControls.classList.add('hidden');
 
-    const taste = tasteFor(accuracy);
+    caption.textContent = '이제 간을 볼 시간!';
+    const salt = await runSeasoningMinigame('🧂 소금 넣기 - 초록 구간에서 넣으세요!', 4000);
+
+    caption.textContent = '2차 불 조절! 다시 초록 구간을 유지하세요';
+    heatControls.classList.remove('hidden');
+    const heat2 = await runHeatMinigame(4000);
+    heatControls.classList.add('hidden');
+
+    caption.textContent = '간장을 뿌릴 차례!';
+    const soy = await runSeasoningMinigame('🫗 간장 뿌리기 - 초록 구간에서 뿌리세요!', 4000);
+
+    caption.textContent = '마지막 불 조절! 끝까지 집중하세요';
+    heatControls.classList.remove('hidden');
+    const heat3 = await runHeatMinigame(4000);
+    heatControls.classList.add('hidden');
+
+    const overallAccuracy = (heat1 + salt + heat2 + soy + heat3) / 5;
+    const taste = tasteFor(overallAccuracy);
     img.src = 'assets/cooking/plate.jpg';
     caption.textContent = `완성! ${taste.label}`;
     await wait(700);
 
-    const cookingScore = Math.round(accuracy * 300);
+    const cookingScore = Math.round(overallAccuracy * 300);
     showResult({
       ...baseResult,
       score: baseResult.score + cookingScore,
       cookingScore,
-      cookingAccuracy: accuracy,
+      cookingAccuracy: overallAccuracy,
       taste,
     });
   }
