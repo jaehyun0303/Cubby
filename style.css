@@ -211,6 +211,20 @@ html, body {
   transition: width 0.25s ease;
 }
 
+.hud-ultimate {
+  color: #8a7a9a;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.hud-ultimate.ready {
+  color: #7a3fb0;
+  background: #fff3ff;
+  animation: ultimate-pulse 1s ease-in-out infinite;
+}
+@keyframes ultimate-pulse {
+  0%, 100% { box-shadow: 0 3px 8px rgba(0,0,0,0.12); }
+  50% { box-shadow: 0 3px 16px rgba(180, 90, 255, 0.55); }
+}
+
 /* ---------- Result panel ---------- */
 .result-stats {
   display: grid;
@@ -275,6 +289,23 @@ body.is-touch .touch-controls:not(.hidden) { display: block; }
   font-size: 1rem;
   background: rgba(255, 111, 160, 0.85);
   color: #fff;
+}
+
+.tc-ultimate {
+  font-size: 0.95rem;
+  background: rgba(122, 63, 176, 0.35);
+  color: #fff;
+  opacity: 0.5;
+}
+.tc-ultimate.locked { opacity: 0.4; }
+.tc-ultimate.ready {
+  opacity: 1;
+  background: linear-gradient(180deg, #c98bff, #7a3fb0);
+  animation: ultimate-pulse-btn 1s ease-in-out infinite;
+}
+@keyframes ultimate-pulse-btn {
+  0%, 100% { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+  50% { box-shadow: 0 4px 22px rgba(180, 90, 255, 0.8); }
 }
 
 @media (max-width: 700px) {

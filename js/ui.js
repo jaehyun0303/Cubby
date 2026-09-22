@@ -28,7 +28,7 @@ const UI = (() => {
         <div class="map-thumb" style="background:linear-gradient(180deg, ${m.theme.sky[0]}, ${m.theme.ground})"></div>
         <h3>${m.name}</h3>
         <p>${m.desc}</p>
-        <div class="map-meta"><span>⏱ ${m.timeLimit}초</span><span>🍽 ${m.build(m.groundY).length}개 지형</span></div>
+        <div class="map-meta"><span>⏱ ${m.timeLimit}초</span><span>🕳 구멍 확률 ${Math.round(m.pitChance * 100)}%</span></div>
       `;
       card.addEventListener('click', () => {
         selectedMapId = m.id;
@@ -61,14 +61,33 @@ const UI = (() => {
     el('hud-size').textContent = `${result.sizePct}%`;
     const pct = Math.min(100, ((result.sizePct - 100) / 200) * 100);
     el('size-bar-fill').style.width = `${Math.max(4, pct)}%`;
+
+    const ult = el('hud-ultimate');
+    const tcUlt = el('tc-ultimate');
+    if (!result.ultimateUnlocked) {
+      ult.textContent = '🔒 궁극기 잠김';
+      ult.classList.remove('ready');
+      tcUlt.classList.remove('ready');
+      tcUlt.classList.add('locked');
+    } else if (result.ultimateReady) {
+      ult.textContent = '⚡ 궁극기 준비!';
+      ult.classList.add('ready');
+      tcUlt.classList.add('ready');
+      tcUlt.classList.remove('locked');
+    } else {
+      ult.textContent = `⏳ 궁극기 ${Math.ceil(result.ultimateCooldown)}s`;
+      ult.classList.remove('ready');
+      tcUlt.classList.remove('ready', 'locked');
+    }
   }
 
   function showResult(result) {
     hud.classList.add('hidden');
     touchControls.classList.add('hidden');
     game.releaseAllTouchInput();
+    el('result-title').textContent = result.reason === 'fell' ? '구멍에 빠졌다!' : '타임 오버!';
     el('result-score').textContent = result.score;
-    el('result-eaten').textContent = `${result.eaten} / ${result.totalTerrain}개`;
+    el('result-eaten').textContent = `${result.eaten}개`;
     el('result-size').textContent = `${result.sizePct}%`;
     el('result-rank').textContent = rankFor(result.sizePct);
     showScreen('result');
@@ -118,6 +137,7 @@ const UI = (() => {
     bindHold('tc-right', () => game.setDirection('right', true), () => game.setDirection('right', false));
     bindHold('tc-jump', () => game.setJumpHeld(true), () => game.setJumpHeld(false));
     el('tc-eat').addEventListener('pointerdown', (e) => { e.preventDefault(); game.triggerEat(); });
+    el('tc-ultimate').addEventListener('pointerdown', (e) => { e.preventDefault(); game.triggerUltimate(); });
   }
 
   function init(gameInstance) {

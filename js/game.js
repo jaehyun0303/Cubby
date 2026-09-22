@@ -1,18 +1,62 @@
-// Level: builds ground segments/platforms/terrain from a map def, handles collision + camera.
+// Level: streams an endless run of ground/platforms/terrain from a map def, handles collision + camera.
 class Level {
   constructor(mapDef) {
     this.mapDef = mapDef;
-    this.width = mapDef.levelWidth;
     this.groundY = mapDef.groundY;
-    this.pits = mapDef.pits;
-    this.platforms = mapDef.platforms;
-    this.terrain = mapDef.build(mapDef.groundY);
+    this.pits = [];
+    this.platforms = [];
+    this.terrain = [];
+    this.nextChunkIndex = 0;
     this.particles = [];
     this.onEat = null; // set by Game, called when an item is consumed
+    this.ensureGenerated(mapDef.chunkWidth * 3); // a safe starting runway
+  }
+
+  // Generates chunks left-to-right until the level is built out past uptoX. The level never
+  // "ends" - this just gets called again each frame with a further uptoX as the camera advances.
+  ensureGenerated(uptoX) {
+    while (this.nextChunkIndex * this.mapDef.chunkWidth < uptoX) {
+      const chunk = generateChunk(this.mapDef, this.nextChunkIndex);
+      this.pits.push(...chunk.pits);
+      this.platforms.push(...chunk.platforms);
+      this.terrain.push(...chunk.terrain);
+      this.nextChunkIndex++;
+    }
   }
 
   isPit(x) {
     return this.pits.some((p) => x > p[0] && x < p[1]);
+  }
+
+  // The Kirby-devours-the-ground ultimate: carves a gap into the ground just ahead of (x, facing)
+  // and sweeps up any nearby terrain items as a bonus. Returns the consumed items for scoring.
+  carveGround(x, facing) {
+    const width = 170 + Math.random() * 40;
+    const startX = facing >= 0 ? x + 30 : x - 30 - width;
+    this.pits.push([startX, startX + width]);
+    const consumed = [];
+    for (const item of this.terrain) {
+      if (item.eaten) continue;
+      if (Math.abs(item.x - x) < 260) {
+        item.eaten = true;
+        consumed.push(item);
+      }
+    }
+    return consumed;
+  }
+
+  spawnGroundBurst(x, y) {
+    for (let i = 0; i < 20; i++) {
+      this.particles.push({
+        x, y: y - 10,
+        vx: (Math.random() - 0.5) * 280,
+        vy: -Math.random() * 240 - 60,
+        life: 0.5 + Math.random() * 0.4,
+        age: 0,
+        color: i % 2 === 0 ? '#caa46b' : this.mapDef.theme.groundDark,
+      });
+    }
+    this.particles.push({ text: '궁극기!', x, y: y - 70, vx: 0, vy: -55, life: 0.9, age: 0, isText: true });
   }
 
   // Returns the Y the player should rest on given current x, or null if airborne.
@@ -84,7 +128,7 @@ class Level {
   drawGround(ctx, camX, canvasW) {
     const theme = this.mapDef.theme;
     const startX = Math.max(0, camX - 50);
-    const endX = Math.min(this.width, camX + canvasW + 50);
+    const endX = camX + canvasW + 50;
 
     ctx.fillStyle = theme.groundDark;
     let segStart = null;
@@ -145,7 +189,7 @@ class Game {
     this.width = canvas.width;
     this.height = canvas.height;
 
-    this.input = { left: false, right: false, jumpHeld: false, jumpPressed: false, eatPressed: false };
+    this.input = { left: false, right: false, jumpHeld: false, jumpPressed: false, eatPressed: false, ultimatePressed: false };
     this.status = 'idle'; // idle | playing | paused | over
     this.level = null;
     this.kirby = null;
@@ -183,6 +227,9 @@ class Game {
     if (code === 'KeyZ' || code === 'Enter' || code === 'KeyJ') {
       if (down) this.input.eatPressed = true;
     }
+    if (code === 'KeyX' || code === 'ShiftLeft' || code === 'ShiftRight') {
+      if (down) this.input.ultimatePressed = true;
+    }
     if (code === 'Escape' && down && this.status === 'playing') {
       this.callbacks.onPauseRequest && this.callbacks.onPauseRequest();
     }
@@ -201,6 +248,10 @@ class Game {
 
   triggerEat() {
     this.input.eatPressed = true;
+  }
+
+  triggerUltimate() {
+    this.input.ultimatePressed = true;
   }
 
   releaseAllTouchInput() {
@@ -236,38 +287,54 @@ class Game {
   }
 
   update(dt) {
+    // keep the level built out ahead of where the camera is about to scroll
+    this.level.ensureGenerated(this.camX + this.width + 1200);
+
     this.kirby.update(dt, this.input, this.level);
     if (this.input.eatPressed) {
       this.kirby.startEat();
     }
+    if (this.input.ultimatePressed) {
+      this.kirby.useUltimate(this.level);
+    }
     this.input.jumpPressed = false;
     this.input.eatPressed = false;
+    this.input.ultimatePressed = false;
 
     this.level.updateParticles(dt);
 
-    // camera follows kirby, clamped to level bounds
+    // camera follows kirby; only the left edge is bounded, the level itself never ends
     const targetCam = this.kirby.x - this.width * 0.4;
     this.camX += (targetCam - this.camX) * Math.min(1, dt * 6);
-    this.camX = Math.max(0, Math.min(this.level.width - this.width, this.camX));
+    this.camX = Math.max(0, this.camX);
+
+    if (this.kirby.dead) {
+      this.status = 'over';
+      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult('fell'));
+      return;
+    }
 
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.status = 'over';
-      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult());
+      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult('time'));
+      return;
     }
 
     this.callbacks.onTick && this.callbacks.onTick(this.buildResult());
   }
 
-  buildResult() {
-    const totalTerrain = this.level.terrain.length;
+  buildResult(reason) {
     return {
+      reason: reason || null,
       score: this.kirby.score,
       eaten: this.kirby.eatenCount,
-      totalTerrain,
       sizePct: Math.round(this.kirby.scale / 0.62 * 100),
       timeLeft: Math.max(0, this.timeLeft),
+      ultimateUnlocked: this.kirby.ultimateUnlocked,
+      ultimateReady: this.kirby.ultimateUnlocked && this.kirby.ultimateCooldown <= 0,
+      ultimateCooldown: Math.max(0, this.kirby.ultimateCooldown),
     };
   }
 

@@ -18,95 +18,89 @@ function makeTerrain(type, x, groundY) {
   };
 }
 
-// Builds a repeating field of terrain items along the ground, skipping pit ranges.
-function scatterTerrain(list, groundY, startX, endX, step, pattern, pits) {
-  let i = 0;
-  for (let x = startX; x < endX; x += step) {
-    const inPit = pits.some((p) => x > p[0] - 20 && x < p[1] + 20);
-    if (inPit) { i++; continue; }
-    const type = pattern[i % pattern.length];
-    list.push(makeTerrain(type, x + (Math.sin(i * 12.9898) * 14), groundY));
-    i++;
+function weightedPick(weights) {
+  const total = weights.reduce((sum, [, w]) => sum + w, 0);
+  let r = Math.random() * total;
+  for (const [type, w] of weights) {
+    r -= w;
+    if (r <= 0) return type;
   }
+  return weights[0][0];
+}
+
+// Generates one chunk's worth of ground pit(s), platforms and scattered terrain.
+// Called on demand as the camera advances, so the level never runs out - it just keeps building ahead.
+function generateChunk(mapDef, index) {
+  const startX = index * mapDef.chunkWidth;
+  const endX = startX + mapDef.chunkWidth;
+  const groundY = mapDef.groundY;
+  const pits = [];
+  const platforms = [];
+  const terrain = [];
+
+  let pitRange = null;
+  if (index >= 2 && Math.random() < mapDef.pitChance) {
+    const pitWidth = 80 + Math.random() * 60;
+    const pitStart = startX + 160 + Math.random() * Math.max(40, mapDef.chunkWidth - 320 - pitWidth);
+    pitRange = [pitStart, pitStart + pitWidth];
+    pits.push(pitRange);
+    if (Math.random() < 0.5) {
+      platforms.push({ x: pitStart - 20, y: groundY - (100 + Math.random() * 70), w: pitWidth + 40 });
+    }
+  }
+
+  const inPit = (x) => pitRange && x > pitRange[0] - 25 && x < pitRange[1] + 25;
+
+  for (let x = startX + 30; x < endX; x += mapDef.terrainStep * (0.65 + Math.random() * 0.7)) {
+    if (inPit(x)) continue;
+    const type = weightedPick(mapDef.terrainWeights);
+    terrain.push(makeTerrain(type, x, groundY));
+  }
+
+  // occasional floating decoration on platforms
+  for (const p of platforms) {
+    if (Math.random() < 0.7) terrain.push(makeTerrain('crystal', p.x + p.w / 2, p.y));
+  }
+
+  return { pits, platforms, terrain };
 }
 
 const MAPS = [
   {
     id: 'green-field',
     name: '그린 필드',
-    desc: '초보자를 위한 평화로운 초원',
+    desc: '초보자를 위한 평화로운 무한 초원',
     theme: { sky: ['#bfe8ff', '#eaf9ff'], ground: '#8fd66d', groundDark: '#5fae4d', accent: '#ffe27a' },
-    levelWidth: 3200,
     groundY: 420,
     timeLimit: 60,
-    pits: [[1500, 1580]],
-    platforms: [
-      { x: 1850, y: 330, w: 160 },
-    ],
-    build(groundY) {
-      const list = [];
-      scatterTerrain(list, groundY, 300, this.levelWidth - 200, 130,
-        ['grass', 'grass', 'bush', 'grass', 'mushroom', 'grass', 'bush'], this.pits);
-      list.push(makeTerrain('crystal', 900, groundY));
-      list.push(makeTerrain('crystal', 2600, groundY));
-      list.push(makeTerrain('tree', 1900, 330));
-      return list;
-    },
+    chunkWidth: 900,
+    terrainStep: 72,
+    pitChance: 0.3,
+    terrainWeights: [['grass', 5], ['bush', 3], ['mushroom', 2], ['tree', 1], ['crystal', 1]],
   },
   {
     id: 'forest-hill',
     name: '포레스트 힐',
     desc: '나무가 우거진 언덕, 플랫폼 점프 주의',
     theme: { sky: ['#bfe0c8', '#eaf7ec'], ground: '#6fae5c', groundDark: '#437a37', accent: '#ffd36e' },
-    levelWidth: 3800,
     groundY: 430,
     timeLimit: 55,
-    pits: [[1100, 1190], [2300, 2400]],
-    platforms: [
-      { x: 1000, y: 330, w: 150 },
-      { x: 1300, y: 300, w: 150 },
-      { x: 2200, y: 340, w: 140 },
-      { x: 2500, y: 300, w: 150 },
-    ],
-    build(groundY) {
-      const list = [];
-      scatterTerrain(list, groundY, 260, this.levelWidth - 200, 115,
-        ['bush', 'tree', 'grass', 'mushroom', 'bush', 'tree', 'grass'], this.pits);
-      list.push(makeTerrain('crystal', 1050, 330));
-      list.push(makeTerrain('crystal', 1350, 300));
-      list.push(makeTerrain('crystal', 3200, groundY));
-      list.push(makeTerrain('tree', 2550, 300));
-      return list;
-    },
+    chunkWidth: 850,
+    terrainStep: 66,
+    pitChance: 0.42,
+    terrainWeights: [['bush', 4], ['tree', 3], ['grass', 3], ['mushroom', 2], ['crystal', 1]],
   },
   {
     id: 'rocky-canyon',
     name: '락키 캐년',
     desc: '험난한 협곡, 시간은 짧고 보석은 많다',
     theme: { sky: ['#e7cfae', '#fbe9d0'], ground: '#c9a06b', groundDark: '#9a7548', accent: '#ff9a6b' },
-    levelWidth: 4200,
     groundY: 440,
     timeLimit: 50,
-    pits: [[900, 990], [1700, 1810], [2600, 2680], [3300, 3400]],
-    platforms: [
-      { x: 850, y: 350, w: 130 },
-      { x: 1650, y: 330, w: 140 },
-      { x: 1800, y: 360, w: 120 },
-      { x: 2550, y: 340, w: 140 },
-      { x: 3250, y: 320, w: 150 },
-    ],
-    build(groundY) {
-      const list = [];
-      scatterTerrain(list, groundY, 250, this.levelWidth - 200, 110,
-        ['rock', 'mushroom', 'rock', 'grass', 'rock', 'bush'], this.pits);
-      list.push(makeTerrain('crystal', 950, 350));
-      list.push(makeTerrain('crystal', 1750, 330));
-      list.push(makeTerrain('crystal', 2620, 340));
-      list.push(makeTerrain('crystal', 3350, 320));
-      list.push(makeTerrain('crystal', 4000, groundY));
-      list.push(makeTerrain('tree', 2100, groundY));
-      return list;
-    },
+    chunkWidth: 820,
+    terrainStep: 62,
+    pitChance: 0.52,
+    terrainWeights: [['rock', 4], ['mushroom', 2], ['grass', 2], ['bush', 2], ['tree', 1], ['crystal', 1]],
   },
 ];
 

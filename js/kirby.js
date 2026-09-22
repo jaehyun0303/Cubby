@@ -1,4 +1,7 @@
 // Kirby player entity: movement, jump/float, eating, and size growth.
+const ULTIMATE_UNLOCK_GROWTH = 0.55; // ~150% size - big enough to start devouring the ground itself
+const ULTIMATE_COOLDOWN = 7;
+
 class Kirby {
   constructor(x, groundY) {
     this.x = x;
@@ -23,6 +26,14 @@ class Kirby {
 
     this.squash = 0; // landing squash animation
     this.bounce = 0;
+
+    this.dead = false; // true once Kirby has fallen into a hole - game over
+    this.ultimateCooldown = 0;
+    this.ultimateFlashTimer = 0;
+  }
+
+  get ultimateUnlocked() {
+    return this.growth >= ULTIMATE_UNLOCK_GROWTH;
   }
 
   get scale() {
@@ -73,6 +84,30 @@ class Kirby {
     if (consumedAny) this.eatPhase = 2;
   }
 
+  // The size-gated ultimate: devours a chunk of ground itself (not just decorations),
+  // in front of Kirby in the direction he's facing, plus anything nearby as a bonus.
+  useUltimate(level) {
+    if (!this.ultimateUnlocked || this.ultimateCooldown > 0 || !this.onGround || this.dead) return false;
+
+    const consumed = level.carveGround(this.x, this.facing);
+    for (const item of consumed) {
+      const def = TERRAIN_TYPES[item.type];
+      this.growth += def.growth * 1.4;
+      this.score += def.value * 2;
+      this.eatenCount += 1;
+      if (level.onEat) level.onEat(item, def);
+    }
+    this.growth += 0.12;
+    this.score += 150;
+    level.spawnGroundBurst(this.x, this.y);
+
+    this.ultimateCooldown = ULTIMATE_COOLDOWN;
+    this.ultimateFlashTimer = 0.5;
+    this.eatPhase = 0;
+    this.eatTimer = 0;
+    return true;
+  }
+
   update(dt, input, level) {
     // -------- horizontal movement --------
     let move = 0;
@@ -88,7 +123,7 @@ class Kirby {
     if (move !== 0) this.facing = move > 0 ? 1 : -1;
 
     this.x += this.vx * dt;
-    this.x = Math.max(40, Math.min(level.width - 40, this.x));
+    this.x = Math.max(40, this.x); // the level scrolls on forever to the right, so only the left edge is bounded
 
     // -------- jump / float --------
     if (input.jumpPressed) {
@@ -121,12 +156,9 @@ class Kirby {
     }
     this.prevY = this.y;
 
-    // fell into a pit
+    // fell into a hole - that's game over now, handled by Game once it sees `dead`
     if (this.y > level.groundY + 260) {
-      this.y = level.groundY;
-      this.x = Math.max(80, this.x - 120);
-      this.vy = 0;
-      this.onGround = true;
+      this.dead = true;
     }
 
     // -------- eating state machine --------
@@ -150,6 +182,8 @@ class Kirby {
       }
     }
     if (this.eatCooldown > 0) this.eatCooldown -= dt;
+    if (this.ultimateCooldown > 0) this.ultimateCooldown -= dt;
+    if (this.ultimateFlashTimer > 0) this.ultimateFlashTimer -= dt;
 
     // -------- animation state --------
     if (this.eatPhase > 0) {
@@ -173,6 +207,7 @@ class Kirby {
   }
 
   currentFrameKey() {
+    if (this.ultimateFlashTimer > 0) return 'eat_7';
     switch (this.state) {
       case 'walk':
         return `walk_${this.walkFrame}`;
@@ -199,7 +234,8 @@ class Kirby {
   draw(ctx, camX) {
     const sx = this.x - camX;
     const sy = this.y + this.squash * 6;
-    const squashedScale = this.scale * (1 - this.squash * 0.1);
+    const flashBoost = this.ultimateFlashTimer > 0 ? 1.25 : 1;
+    const squashedScale = this.scale * (1 - this.squash * 0.1) * flashBoost;
 
     KirbySprites.draw(ctx, this.currentFrameKey(), sx, sy, {
       scale: squashedScale * 1.15,

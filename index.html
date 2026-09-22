@@ -19,7 +19,8 @@
         <button id="btn-play" class="btn btn-primary">▶ 플레이하기</button>
         <button id="btn-select-map" class="btn btn-secondary">🗺 맵 선택</button>
       </div>
-      <p class="hint">이동: ← → (또는 A D) · 점프: ↑ / Space · 먹기: Z / Enter</p>
+      <p class="hint">이동: ← → (또는 A D) · 점프: ↑ / Space · 먹기: Z / Enter · 궁극기: X / Shift (커지면 해금)</p>
+      <p class="hint">⚠ 구멍에 빠지면 게임이 끝나요!</p>
     </div>
   </section>
 
@@ -37,6 +38,7 @@
     <div class="hud-left">
       <div class="hud-chip">⏱ <span id="hud-time">60</span>s</div>
       <div class="hud-chip">⭐ <span id="hud-score">0</span></div>
+      <div id="hud-ultimate" class="hud-chip hud-ultimate">🔒 궁극기 잠김</div>
     </div>
     <div class="hud-right">
       <div class="hud-chip">📏 크기 <span id="hud-size">100%</span></div>
@@ -54,6 +56,7 @@
       <button id="tc-right" class="tc-btn" aria-label="오른쪽 이동">▶</button>
     </div>
     <div class="tc-actions">
+      <button id="tc-ultimate" class="tc-btn tc-ultimate locked" aria-label="궁극기">궁극</button>
       <button id="tc-eat" class="tc-btn tc-eat" aria-label="먹기">먹기</button>
       <button id="tc-jump" class="tc-btn tc-jump" aria-label="점프">▲</button>
     </div>
