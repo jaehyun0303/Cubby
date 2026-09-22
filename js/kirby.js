@@ -1,6 +1,8 @@
 // Kirby player entity: movement, jump/float, eating, and size growth.
 const ULTIMATE_UNLOCK_GROWTH = 0.55; // ~150% size - big enough to start devouring the ground itself
 const ULTIMATE_COOLDOWN = 7;
+const MONSTER_EAT_GROWTH = 0.35; // ~131% size - big enough that monsters stop being a threat and become food
+const MOVEMENT_GROWTH_CAP = 1.4; // speed/jump only ease off up to this much growth - visual size keeps climbing forever
 
 class Kirby {
   constructor(x, groundY) {
@@ -27,7 +29,8 @@ class Kirby {
     this.squash = 0; // landing squash animation
     this.bounce = 0;
 
-    this.dead = false; // true once Kirby has fallen into a hole - game over
+    this.dead = false; // true once Kirby has died (fell in a hole, or a monster got him) - game over
+    this.deathReason = null; // 'fell' | 'monster'
     this.ultimateCooldown = 0;
     this.ultimateFlashTimer = 0;
   }
@@ -36,10 +39,14 @@ class Kirby {
     return this.growth >= ULTIMATE_UNLOCK_GROWTH;
   }
 
+  get canEatMonsters() {
+    return this.growth >= MONSTER_EAT_GROWTH;
+  }
+
   get scale() {
+    // No cap - Kirby just keeps getting bigger the more he eats, for as long as the run lasts.
     const base = 0.62;
-    const grown = Math.min(this.growth, 1.4); // cap growth influence
-    return base + grown * 0.55;
+    return base + this.growth * 0.55;
   }
 
   get reach() {
@@ -47,12 +54,13 @@ class Kirby {
   }
 
   get speed() {
-    // grows a little slower as it gets bigger, but not punishing
-    return 235 - Math.min(this.growth, 1.4) * 45;
+    // grows a little slower as it gets bigger, but not punishing - and this eases off only up to
+    // MOVEMENT_GROWTH_CAP so movement stays playable even though visual size keeps climbing
+    return 235 - Math.min(this.growth, MOVEMENT_GROWTH_CAP) * 45;
   }
 
   get jumpPower() {
-    return 560 - Math.min(this.growth, 1.4) * 60;
+    return 560 - Math.min(this.growth, MOVEMENT_GROWTH_CAP) * 60;
   }
 
   startEat() {
@@ -159,6 +167,7 @@ class Kirby {
     // fell into a hole - that's game over now, handled by Game once it sees `dead`
     if (this.y > level.groundY + 260) {
       this.dead = true;
+      this.deathReason = 'fell';
     }
 
     // -------- eating state machine --------

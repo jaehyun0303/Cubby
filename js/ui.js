@@ -50,6 +50,8 @@ const UI = (() => {
   }
 
   function rankFor(pct) {
+    if (pct >= 700) return 'SSS';
+    if (pct >= 450) return 'SS';
     if (pct >= 260) return 'S';
     if (pct >= 210) return 'A';
     if (pct >= 170) return 'B';
@@ -81,13 +83,18 @@ const UI = (() => {
       ult.classList.remove('ready');
       tcUlt.classList.remove('ready', 'locked');
     }
+
+    const monsterChip = el('hud-monster');
+    monsterChip.textContent = result.canEatMonsters ? '👹 몬스터: 간식!' : '👹 몬스터: 위험!';
+    monsterChip.classList.toggle('safe', result.canEatMonsters);
   }
 
   function showResult(result) {
     hud.classList.add('hidden');
     touchControls.classList.add('hidden');
     game.releaseAllTouchInput();
-    el('result-title').textContent = result.reason === 'fell' ? '구멍에 빠졌다!' : '타임 오버!';
+    const titles = { fell: '구멍에 빠졌다!', monster: '몬스터에게 당했다!' };
+    el('result-title').textContent = titles[result.reason] || '타임 오버!';
     el('result-score').textContent = result.score;
     el('result-eaten').textContent = `${result.eaten}개`;
     el('result-size').textContent = `${result.sizePct}%`;

@@ -18,6 +18,24 @@ function makeTerrain(type, x, groundY) {
   };
 }
 
+// Monsters: a hazard while Kirby is small, food once he's grown past MONSTER_EAT_GROWTH (kirby.js).
+const MONSTER_TYPES = {
+  spike: { label: '스파이크', value: 40, growth: 0.060, radius: 24, color: '#8a5fd6', dark: '#5a3a94', speed: 75, range: 100 },
+  grump: { label: '그럼피',   value: 70, growth: 0.100, radius: 32, color: '#e0574a', dark: '#9c342a', speed: 48, range: 140 },
+};
+
+function makeMonster(type, x, groundY) {
+  return {
+    type,
+    x,
+    baseX: x,
+    y: groundY,
+    dir: Math.random() < 0.5 ? -1 : 1,
+    alive: true,
+    bobSeed: Math.random() * Math.PI * 2,
+  };
+}
+
 function weightedPick(weights) {
   const total = weights.reduce((sum, [, w]) => sum + w, 0);
   let r = Math.random() * total;
@@ -37,6 +55,7 @@ function generateChunk(mapDef, index) {
   const pits = [];
   const platforms = [];
   const terrain = [];
+  const monsters = [];
 
   let pitRange = null;
   if (index >= 2 && Math.random() < mapDef.pitChance) {
@@ -62,7 +81,20 @@ function generateChunk(mapDef, index) {
     if (Math.random() < 0.7) terrain.push(makeTerrain('crystal', p.x + p.w / 2, p.y));
   }
 
-  return { pits, platforms, terrain };
+  if (index >= 2 && Math.random() < mapDef.monsterChance) {
+    let mx;
+    let tries = 0;
+    do {
+      mx = startX + 120 + Math.random() * Math.max(40, mapDef.chunkWidth - 240);
+      tries++;
+    } while (inPit(mx) && tries < 6);
+    if (!inPit(mx)) {
+      const type = weightedPick(mapDef.monsterWeights);
+      monsters.push(makeMonster(type, mx, groundY));
+    }
+  }
+
+  return { pits, platforms, terrain, monsters };
 }
 
 const MAPS = [
@@ -77,6 +109,8 @@ const MAPS = [
     terrainStep: 72,
     pitChance: 0.3,
     terrainWeights: [['grass', 5], ['bush', 3], ['mushroom', 2], ['tree', 1], ['crystal', 1]],
+    monsterChance: 0.35,
+    monsterWeights: [['spike', 3], ['grump', 1]],
   },
   {
     id: 'forest-hill',
@@ -89,6 +123,8 @@ const MAPS = [
     terrainStep: 66,
     pitChance: 0.42,
     terrainWeights: [['bush', 4], ['tree', 3], ['grass', 3], ['mushroom', 2], ['crystal', 1]],
+    monsterChance: 0.42,
+    monsterWeights: [['spike', 2], ['grump', 2]],
   },
   {
     id: 'rocky-canyon',
@@ -101,6 +137,8 @@ const MAPS = [
     terrainStep: 62,
     pitChance: 0.52,
     terrainWeights: [['rock', 4], ['mushroom', 2], ['grass', 2], ['bush', 2], ['tree', 1], ['crystal', 1]],
+    monsterChance: 0.5,
+    monsterWeights: [['spike', 2], ['grump', 3]],
   },
 ];
 
@@ -189,6 +227,73 @@ function drawTerrainItem(ctx, item, camX, t) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(4, -18); ctx.lineTo(0, -10); ctx.closePath(); ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// ---- Monster drawing (procedural canvas shapes) ----
+function drawMonster(ctx, m, camX, t, canEat) {
+  if (!m.alive) return;
+  const def = MONSTER_TYPES[m.type];
+  const sx = m.x - camX;
+  if (sx < -80 || sx > 1100) return;
+  const bob = Math.sin(t * 4 + m.bobSeed) * 3;
+  const sy = m.y + bob;
+  const flip = m.dir < 0;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(flip ? -1 : 1, 1);
+  if (canEat) { ctx.globalAlpha = 0.55; } // telegraph that it's now safe/edible rather than a threat
+
+  switch (m.type) {
+    case 'spike': {
+      const r = def.radius;
+      ctx.fillStyle = def.dark;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const sr = i % 2 === 0 ? r + 10 : r - 2;
+        const px = Math.cos(a) * sr;
+        const py = -r + Math.sin(a) * sr;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.arc(0, -r, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(-7, -r - 3, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(7, -r - 3, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2a1f3d';
+      ctx.beginPath(); ctx.arc(-7, -r - 1, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(7, -r - 1, 2.4, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'grump': {
+      const r = def.radius;
+      ctx.fillStyle = def.dark;
+      ctx.beginPath(); ctx.ellipse(0, -r + 4, r + 4, r, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.ellipse(0, -r + 6, r, r - 4, 0, 0, Math.PI * 2); ctx.fill();
+      // angry eyebrows
+      ctx.strokeStyle = '#3a1410';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.6, -r - 2); ctx.lineTo(-r * 0.1, -r + 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.6, -r - 2); ctx.lineTo(r * 0.1, -r + 6); ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(-r * 0.35, -r + 8, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.35, -r + 8, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2a1f3d';
+      ctx.beginPath(); ctx.arc(-r * 0.35, -r + 9, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.35, -r + 9, 2.6, 0, Math.PI * 2); ctx.fill();
+      // fangs
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.moveTo(-6, -r + 16); ctx.lineTo(-2, -r + 16); ctx.lineTo(-4, -r + 24); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(6, -r + 16); ctx.lineTo(2, -r + 16); ctx.lineTo(4, -r + 24); ctx.closePath(); ctx.fill();
       break;
     }
   }

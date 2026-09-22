@@ -7,6 +7,7 @@ class Level {
     this.craters = []; // shallow cosmetic dents left by the ultimate - safe to stand on, unlike pits
     this.platforms = [];
     this.terrain = [];
+    this.monsters = [];
     this.nextChunkIndex = 0;
     this.particles = [];
     this.onEat = null; // set by Game, called when an item is consumed
@@ -21,7 +22,20 @@ class Level {
       this.pits.push(...chunk.pits);
       this.platforms.push(...chunk.platforms);
       this.terrain.push(...chunk.terrain);
+      this.monsters.push(...chunk.monsters);
       this.nextChunkIndex++;
+    }
+  }
+
+  updateMonsters(dt) {
+    for (const m of this.monsters) {
+      if (!m.alive) continue;
+      const def = MONSTER_TYPES[m.type];
+      m.x += m.dir * def.speed * dt;
+      if (Math.abs(m.x - m.baseX) > def.range) {
+        m.dir *= -1;
+        m.x = m.baseX + def.range * Math.sign(m.x - m.baseX || 1);
+      }
     }
   }
 
@@ -33,13 +47,13 @@ class Level {
   // a cosmetic dent, not a real pit, so using it never drops Kirby through the ground - and
   // sweeps up any nearby terrain items as a bonus. Returns the consumed items for scoring.
   carveGround(x, facing) {
-    const width = 170 + Math.random() * 40;
+    const width = 280 + Math.random() * 80; // a much bigger dig than before
     const startX = facing >= 0 ? x + 30 : x - 30 - width;
     this.craters.push([startX, startX + width]);
     const consumed = [];
     for (const item of this.terrain) {
       if (item.eaten) continue;
-      if (Math.abs(item.x - x) < 260) {
+      if (Math.abs(item.x - x) < 340) {
         item.eaten = true;
         consumed.push(item);
       }
@@ -157,23 +171,28 @@ class Level {
       ctx.fillRect(sx, p.y, p.w, 6);
     }
 
-    // ultimate craters - a shallow dent drawn into the ground surface, fully walkable
+    // ultimate craters - a deep-looking dent drawn into the ground surface, but still fully walkable
     for (const c of this.craters) {
       const cx = (c[0] + c[1]) / 2 - camX;
       const w = c[1] - c[0];
       if (cx + w / 2 < 0 || cx - w / 2 > canvasW) continue;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(c[0] - camX, this.groundY - 2, w, 40);
+      ctx.rect(c[0] - camX, this.groundY - 2, w, 60);
       ctx.clip();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      // wide dark outer bowl, then a smaller darker core for a layered depth illusion
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
-      ctx.ellipse(cx, this.groundY + 6, w / 2, 16, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, this.groundY + 10, w / 2, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(cx, this.groundY + 14, w / 2.6, 18, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(cx, this.groundY + 2, w / 2 - 6, 10, 0, Math.PI, Math.PI * 2);
+      ctx.ellipse(cx, this.groundY + 3, w / 2 - 8, 13, 0, Math.PI, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -283,6 +302,32 @@ class Game {
     this.input.jumpHeld = false;
   }
 
+  // Touching a monster is lethal while Kirby is too small, and free food once he's grown enough
+  // (kirby.canEatMonsters). Runs after kirby.update() so it sees this frame's final position.
+  checkMonsterCollisions() {
+    const k = this.kirby;
+    const kTop = k.y - k.scale * 130;
+    for (const m of this.level.monsters) {
+      if (!m.alive) continue;
+      const def = MONSTER_TYPES[m.type];
+      const mTop = m.y - def.radius * 2.2;
+      const verticalOverlap = kTop < m.y && k.y > mTop;
+      const horizontalHit = Math.abs(m.x - k.x) < def.radius * 0.9 + k.scale * 38;
+      if (!verticalOverlap || !horizontalHit) continue;
+
+      if (k.canEatMonsters) {
+        m.alive = false;
+        k.growth += def.growth;
+        k.score += def.value;
+        k.eatenCount += 1;
+        this.level.spawnParticles(m, def);
+      } else {
+        k.dead = true;
+        k.deathReason = 'monster';
+      }
+    }
+  }
+
   start(mapDef) {
     this.level = new Level(mapDef);
     this.level.onEat = (item, def) => this.level.spawnParticles(item, def);
@@ -313,7 +358,9 @@ class Game {
     // keep the level built out ahead of where the camera is about to scroll
     this.level.ensureGenerated(this.camX + this.width + 1200);
 
+    this.level.updateMonsters(dt);
     this.kirby.update(dt, this.input, this.level);
+    this.checkMonsterCollisions();
     if (this.input.eatPressed) {
       this.kirby.startEat();
     }
@@ -333,7 +380,7 @@ class Game {
 
     if (this.kirby.dead) {
       this.status = 'over';
-      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult('fell'));
+      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult(this.kirby.deathReason || 'fell'));
       return;
     }
 
@@ -361,6 +408,7 @@ class Game {
       ultimateUnlocked: this.kirby.ultimateUnlocked,
       ultimateReady: this.kirby.ultimateUnlocked && this.kirby.ultimateCooldown <= 0,
       ultimateCooldown: Math.max(0, this.kirby.ultimateCooldown),
+      canEatMonsters: this.kirby.canEatMonsters,
     };
   }
 
@@ -375,6 +423,9 @@ class Game {
     const t = performance.now() / 1000;
     for (const item of this.level.terrain) {
       drawTerrainItem(ctx, item, this.camX, t);
+    }
+    for (const m of this.level.monsters) {
+      drawMonster(ctx, m, this.camX, t, this.kirby.canEatMonsters);
     }
 
     this.level.drawParticles(ctx, this.camX);
