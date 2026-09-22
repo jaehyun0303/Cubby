@@ -188,6 +188,27 @@ class Game {
     }
   }
 
+  // ---- touch/on-screen button input (mirrors _handleKey for mobile controls) ----
+  setDirection(dir, active) {
+    if (dir === 'left') this.input.left = active;
+    if (dir === 'right') this.input.right = active;
+  }
+
+  setJumpHeld(active) {
+    if (active && !this.input.jumpHeld) this.input.jumpPressed = true;
+    this.input.jumpHeld = active;
+  }
+
+  triggerEat() {
+    this.input.eatPressed = true;
+  }
+
+  releaseAllTouchInput() {
+    this.input.left = false;
+    this.input.right = false;
+    this.input.jumpHeld = false;
+  }
+
   start(mapDef) {
     this.level = new Level(mapDef);
     this.level.onEat = (item, def) => this.level.spawnParticles(item, def);

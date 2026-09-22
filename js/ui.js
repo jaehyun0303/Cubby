@@ -11,6 +11,7 @@ const UI = (() => {
     result: el('screen-result'),
   };
   const hud = el('hud');
+  const touchControls = el('touch-controls');
 
   function showScreen(name) {
     Object.values(screens).forEach((s) => s.classList.remove('active'));
@@ -42,6 +43,7 @@ const UI = (() => {
     const mapDef = getMapById(selectedMapId);
     game.start(mapDef);
     hud.classList.remove('hidden');
+    touchControls.classList.remove('hidden');
     showScreen(null);
   }
 
@@ -63,6 +65,8 @@ const UI = (() => {
 
   function showResult(result) {
     hud.classList.add('hidden');
+    touchControls.classList.add('hidden');
+    game.releaseAllTouchInput();
     el('result-score').textContent = result.score;
     el('result-eaten').textContent = `${result.eaten} / ${result.totalTerrain}개`;
     el('result-size').textContent = `${result.sizePct}%`;
@@ -78,11 +82,42 @@ const UI = (() => {
     el('btn-pause').addEventListener('click', () => { game.pause(); showScreen('pause'); });
     el('btn-resume').addEventListener('click', () => { game.resume(); showScreen(null); });
     el('btn-pause-restart').addEventListener('click', () => { launchGame(); });
-    el('btn-pause-title').addEventListener('click', () => { hud.classList.add('hidden'); showScreen('title'); });
+    el('btn-pause-title').addEventListener('click', () => {
+      hud.classList.add('hidden');
+      touchControls.classList.add('hidden');
+      game.releaseAllTouchInput();
+      showScreen('title');
+    });
 
     el('btn-retry').addEventListener('click', () => launchGame());
     el('btn-result-map').addEventListener('click', () => { buildMapList(); showScreen('mapSelect'); });
     el('btn-result-title').addEventListener('click', () => showScreen('title'));
+  }
+
+  // Detect touch-capable devices so the on-screen buttons only show up where needed.
+  function detectTouch() {
+    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    if (isTouch) document.body.classList.add('is-touch');
+  }
+
+  // Pointer Events cover touch + mouse/stylus uniformly, so this also works for quick testing with a mouse.
+  function bindHold(btnId, onDown, onUp) {
+    const btn = el(btnId);
+    const release = () => onUp();
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); onDown(); });
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
+  }
+
+  function bindTouchControls() {
+    // Each button captures its own pointer (see bindHold), so release/cancel/leave fire
+    // reliably per-finger even if it slides outside the button - safe for multi-touch
+    // (e.g. holding left + jump with two fingers at once) without a global reset.
+    bindHold('tc-left', () => game.setDirection('left', true), () => game.setDirection('left', false));
+    bindHold('tc-right', () => game.setDirection('right', true), () => game.setDirection('right', false));
+    bindHold('tc-jump', () => game.setJumpHeld(true), () => game.setJumpHeld(false));
+    el('tc-eat').addEventListener('pointerdown', (e) => { e.preventDefault(); game.triggerEat(); });
   }
 
   function init(gameInstance) {
@@ -90,7 +125,9 @@ const UI = (() => {
     game.callbacks.onTick = updateHud;
     game.callbacks.onGameOver = showResult;
     game.callbacks.onPauseRequest = () => { game.pause(); showScreen('pause'); };
+    detectTouch();
     bind();
+    bindTouchControls();
     buildMapList();
     showScreen('title');
   }
