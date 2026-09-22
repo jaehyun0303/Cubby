@@ -272,11 +272,15 @@ const UI = (() => {
       controls.classList.remove('hidden');
 
       let locked = false;
+      let armed = false; // ignores a tap/keypress still "in flight" from the previous step for a beat
       let pos = 0;
       let dir = 1;
       let elapsedMs = 0;
       let lastTs = null;
       const speed = 145; // %/s sweep rate
+      const armDelayMs = 350;
+
+      const armTimer = setTimeout(() => { armed = true; }, armDelayMs);
 
       function frame(ts) {
         if (locked) return;
@@ -297,6 +301,7 @@ const UI = (() => {
       function finish() {
         if (locked) return;
         locked = true;
+        clearTimeout(armTimer);
         controls.classList.add('hidden');
         btn.removeEventListener('pointerdown', onTap);
         window.removeEventListener('keydown', onKey);
@@ -304,8 +309,9 @@ const UI = (() => {
         resolve(Math.max(0, 1 - distFromCenter / 42));
       }
 
-      function onTap(e) { e.preventDefault(); finish(); }
+      function onTap(e) { if (!armed) return; e.preventDefault(); finish(); }
       function onKey(e) {
+        if (!armed) return;
         if (e.code === 'KeyZ' || e.code === 'Enter' || e.code === 'KeyJ') { e.preventDefault(); finish(); }
       }
 
@@ -340,22 +346,32 @@ const UI = (() => {
 
     img.src = 'assets/cooking/pan.jpg';
 
+    // Each step gets a beat with no controls on screen first, so a still-held key/button or a
+    // reflex tap left over from the previous step can't immediately resolve the next one.
+    caption.textContent = '준비하세요... 1차 불 조절!';
+    await wait(600);
     caption.textContent = '1차 불 조절! 초록 구간을 유지하세요';
     heatControls.classList.remove('hidden');
     const heat1 = await runHeatMinigame(4000);
     heatControls.classList.add('hidden');
 
-    caption.textContent = '이제 간을 볼 시간!';
+    caption.textContent = '이제 간을 볼 시간...';
+    await wait(600);
     const salt = await runSeasoningMinigame('🧂 소금 넣기 - 초록 구간에서 넣으세요!', 4000);
 
+    caption.textContent = '준비하세요... 2차 불 조절!';
+    await wait(600);
     caption.textContent = '2차 불 조절! 다시 초록 구간을 유지하세요';
     heatControls.classList.remove('hidden');
     const heat2 = await runHeatMinigame(4000);
     heatControls.classList.add('hidden');
 
-    caption.textContent = '간장을 뿌릴 차례!';
+    caption.textContent = '간장을 뿌릴 준비...';
+    await wait(600);
     const soy = await runSeasoningMinigame('🫗 간장 뿌리기 - 초록 구간에서 뿌리세요!', 4000);
 
+    caption.textContent = '준비하세요... 마지막 불 조절!';
+    await wait(600);
     caption.textContent = '마지막 불 조절! 끝까지 집중하세요';
     heatControls.classList.remove('hidden');
     const heat3 = await runHeatMinigame(4000);
