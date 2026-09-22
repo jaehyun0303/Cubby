@@ -318,7 +318,10 @@ class Game {
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.status = 'over';
-      this.callbacks.onGameOver && this.callbacks.onGameOver(this.buildResult('time'));
+      // time running out leads into the cooking cutscene rather than an immediate result screen
+      const result = this.buildResult('time');
+      if (this.callbacks.onTimeUp) this.callbacks.onTimeUp(result);
+      else this.callbacks.onGameOver && this.callbacks.onGameOver(result);
       return;
     }
 

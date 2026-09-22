@@ -8,10 +8,12 @@ const UI = (() => {
     title: el('screen-title'),
     mapSelect: el('screen-map-select'),
     pause: el('screen-pause'),
+    cooking: el('screen-cooking'),
     result: el('screen-result'),
   };
   const hud = el('hud');
   const touchControls = el('touch-controls');
+  let heatPressed = false; // mirrors game.input.jumpHeld for the cooking minigame's own button
 
   function showScreen(name) {
     Object.values(screens).forEach((s) => s.classList.remove('active'));
@@ -90,7 +92,117 @@ const UI = (() => {
     el('result-eaten').textContent = `${result.eaten}개`;
     el('result-size').textContent = `${result.sizePct}%`;
     el('result-rank').textContent = rankFor(result.sizePct);
+
+    const cookingStat = el('stat-cooking-score');
+    const tasteBanner = el('result-taste');
+    if (result.taste) {
+      cookingStat.classList.remove('hidden');
+      el('result-cooking-score').textContent = `+${result.cookingScore}`;
+      tasteBanner.classList.remove('hidden');
+      tasteBanner.className = `taste-banner ${result.taste.cls}`;
+      tasteBanner.textContent = result.taste.label;
+    } else {
+      cookingStat.classList.add('hidden');
+      tasteBanner.classList.add('hidden');
+    }
     showScreen('result');
+  }
+
+  // ---------- Time's-up cooking cutscene + heat-control minigame ----------
+  const HEAT_ZONE_MIN = 55;
+  const HEAT_ZONE_MAX = 82;
+
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function tasteFor(accuracy) {
+    if (accuracy >= 0.8) return { label: '⭐⭐⭐⭐⭐ 환상의 커비 요리!', cls: 'taste-5' };
+    if (accuracy >= 0.6) return { label: '⭐⭐⭐⭐ 맛있게 완성!', cls: 'taste-4' };
+    if (accuracy >= 0.4) return { label: '⭐⭐⭐ 그럭저럭 먹을만해요', cls: 'taste-3' };
+    if (accuracy >= 0.2) return { label: '⭐⭐ 살짝 탔어요...', cls: 'taste-2' };
+    return { label: '⭐ 새까맣게 타버렸다...', cls: 'taste-1' };
+  }
+
+  // Returns a promise resolving to the fraction of time (0..1) the heat was kept in the ideal zone.
+  // Reads both the keyboard/mobile jump input (already wired for gameplay) and this scene's own
+  // press-and-hold button, so any of Up/Space/tc-jump/cooking-heat-btn raises the heat.
+  function runHeatMinigame(durationMs) {
+    return new Promise((resolve) => {
+      const needle = el('heat-needle');
+      let heat = 20;
+      let timeInZone = 0;
+      let elapsedMs = 0;
+      let lastTs = null;
+
+      function frame(ts) {
+        if (lastTs === null) lastTs = ts;
+        const dt = Math.min((ts - lastTs) / 1000, 1 / 30);
+        lastTs = ts;
+        elapsedMs += dt * 1000;
+
+        const held = game.input.jumpHeld || heatPressed;
+        heat += (held ? 95 : -60) * dt;
+        heat = Math.max(0, Math.min(100, heat));
+
+        const inZone = heat >= HEAT_ZONE_MIN && heat <= HEAT_ZONE_MAX;
+        if (inZone) timeInZone += dt;
+
+        needle.style.bottom = `${heat}%`;
+        needle.classList.toggle('in-zone', inZone);
+
+        if (elapsedMs < durationMs) {
+          requestAnimationFrame(frame);
+        } else {
+          resolve(Math.max(0, Math.min(1, timeInZone / (durationMs / 1000))));
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  async function runCookingScenes(baseResult) {
+    const img = el('cooking-image');
+    const caption = el('cooking-caption');
+    const heatControls = el('cooking-heat-controls');
+    heatControls.classList.add('hidden');
+
+    img.src = 'assets/cooking/board.jpg';
+    caption.textContent = '앗, 시간 종료! 커비가 도마 위에 올라갔다...';
+    await wait(1600);
+
+    img.src = 'assets/cooking/diced.jpg';
+    caption.textContent = '숭덩숭덩... 먹기 좋은 크기로 썰렸다!';
+    await wait(1400);
+
+    img.src = 'assets/cooking/pan.jpg';
+    caption.textContent = '불 조절이 맛을 좌우한다! 초록 구간을 유지하세요';
+    heatControls.classList.remove('hidden');
+    const accuracy = await runHeatMinigame(9000);
+    heatControls.classList.add('hidden');
+
+    const taste = tasteFor(accuracy);
+    img.src = 'assets/cooking/plate.jpg';
+    caption.textContent = `완성! ${taste.label}`;
+    await wait(700);
+
+    const cookingScore = Math.round(accuracy * 300);
+    showResult({
+      ...baseResult,
+      score: baseResult.score + cookingScore,
+      cookingScore,
+      cookingAccuracy: accuracy,
+      taste,
+    });
+  }
+
+  function startCookingSequence(result) {
+    hud.classList.add('hidden');
+    touchControls.classList.add('hidden');
+    game.releaseAllTouchInput();
+    heatPressed = false;
+    showScreen('cooking');
+    runCookingScenes(result);
   }
 
   function bind() {
@@ -123,7 +235,11 @@ const UI = (() => {
   function bindHold(btnId, onDown, onUp) {
     const btn = el(btnId);
     const release = () => onUp();
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); onDown(); });
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (err) { /* unsupported/invalid pointer - the up/cancel/leave listeners still cover release */ }
+      onDown();
+    });
     btn.addEventListener('pointerup', release);
     btn.addEventListener('pointercancel', release);
     btn.addEventListener('pointerleave', release);
@@ -138,12 +254,14 @@ const UI = (() => {
     bindHold('tc-jump', () => game.setJumpHeld(true), () => game.setJumpHeld(false));
     el('tc-eat').addEventListener('pointerdown', (e) => { e.preventDefault(); game.triggerEat(); });
     el('tc-ultimate').addEventListener('pointerdown', (e) => { e.preventDefault(); game.triggerUltimate(); });
+    bindHold('cooking-heat-btn', () => { heatPressed = true; }, () => { heatPressed = false; });
   }
 
   function init(gameInstance) {
     game = gameInstance;
     game.callbacks.onTick = updateHud;
     game.callbacks.onGameOver = showResult;
+    game.callbacks.onTimeUp = startCookingSequence;
     game.callbacks.onPauseRequest = () => { game.pause(); showScreen('pause'); };
     detectTouch();
     bind();

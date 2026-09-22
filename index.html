@@ -74,6 +74,24 @@
     </div>
   </section>
 
+  <!-- Time's-up cooking cutscene + heat-control minigame -->
+  <section id="screen-cooking" class="screen overlay">
+    <div class="panel cooking-panel">
+      <h2>시간 종료!</h2>
+      <div class="cooking-scene">
+        <img id="cooking-image" src="assets/cooking/board.jpg" alt="" />
+        <div id="cooking-heat-controls" class="cooking-heat-controls hidden">
+          <div class="heat-gauge">
+            <div class="heat-zone"></div>
+            <div id="heat-needle" class="heat-needle"></div>
+          </div>
+          <button id="cooking-heat-btn" class="btn btn-primary heat-btn">🔥 누르고 있기 (또는 ↑/Space)</button>
+        </div>
+      </div>
+      <p id="cooking-caption" class="cooking-caption">앗, 시간 종료! 커비가 도마 위에...</p>
+    </div>
+  </section>
+
   <!-- Game Over / Result Screen -->
   <section id="screen-result" class="screen overlay">
     <div class="panel result-panel">
@@ -83,7 +101,9 @@
         <div class="stat"><span class="stat-label">먹은 지형</span><span id="result-eaten" class="stat-value">0개</span></div>
         <div class="stat"><span class="stat-label">최종 크기</span><span id="result-size" class="stat-value">100%</span></div>
         <div class="stat"><span class="stat-label">등급</span><span id="result-rank" class="stat-value">C</span></div>
+        <div class="stat hidden" id="stat-cooking-score"><span class="stat-label">요리 점수</span><span id="result-cooking-score" class="stat-value">+0</span></div>
       </div>
+      <p id="result-taste" class="taste-banner hidden"></p>
       <div class="menu-buttons">
         <button id="btn-retry" class="btn btn-primary">🔄 다시하기</button>
         <button id="btn-result-map" class="btn btn-secondary">🗺 다른 맵</button>
