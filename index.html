@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>커비의 지형 먹방</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game-canvas" width="960" height="540"></canvas>
+
+  <!-- Title Screen -->
+  <section id="screen-title" class="screen active">
+    <div class="title-card">
+      <h1 class="logo">커비의 <span>지형 먹방</span></h1>
+      <p class="subtitle">주변 지형을 먹어치우고 커다랗게 커져보자!</p>
+      <div class="menu-buttons">
+        <button id="btn-play" class="btn btn-primary">▶ 플레이하기</button>
+        <button id="btn-select-map" class="btn btn-secondary">🗺 맵 선택</button>
+      </div>
+      <p class="hint">이동: ← → (또는 A D) · 점프: ↑ / Space · 먹기: Z / Enter</p>
+    </div>
+  </section>
+
+  <!-- Map Select Screen -->
+  <section id="screen-map-select" class="screen">
+    <div class="panel">
+      <h2>맵 선택</h2>
+      <div id="map-list" class="map-list"></div>
+      <button id="btn-back-from-map" class="btn btn-ghost">← 뒤로</button>
+    </div>
+  </section>
+
+  <!-- HUD (during gameplay) -->
+  <section id="hud" class="hud hidden">
+    <div class="hud-left">
+      <div class="hud-chip">⏱ <span id="hud-time">60</span>s</div>
+      <div class="hud-chip">⭐ <span id="hud-score">0</span></div>
+    </div>
+    <div class="hud-right">
+      <div class="hud-chip">📏 크기 <span id="hud-size">100%</span></div>
+      <button id="btn-pause" class="btn btn-tiny">⏸</button>
+    </div>
+    <div class="size-bar-wrap">
+      <div id="size-bar-fill" class="size-bar-fill"></div>
+    </div>
+  </section>
+
+  <!-- Pause Overlay -->
+  <section id="screen-pause" class="screen overlay">
+    <div class="panel">
+      <h2>일시정지</h2>
+      <div class="menu-buttons">
+        <button id="btn-resume" class="btn btn-primary">계속하기</button>
+        <button id="btn-pause-restart" class="btn btn-secondary">다시하기</button>
+        <button id="btn-pause-title" class="btn btn-ghost">타이틀로</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Over / Result Screen -->
+  <section id="screen-result" class="screen overlay">
+    <div class="panel result-panel">
+      <h2 id="result-title">타임 오버!</h2>
+      <div class="result-stats">
+        <div class="stat"><span class="stat-label">획득 점수</span><span id="result-score" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">먹은 지형</span><span id="result-eaten" class="stat-value">0개</span></div>
+        <div class="stat"><span class="stat-label">최종 크기</span><span id="result-size" class="stat-value">100%</span></div>
+        <div class="stat"><span class="stat-label">등급</span><span id="result-rank" class="stat-value">C</span></div>
+      </div>
+      <div class="menu-buttons">
+        <button id="btn-retry" class="btn btn-primary">🔄 다시하기</button>
+        <button id="btn-result-map" class="btn btn-secondary">🗺 다른 맵</button>
+        <button id="btn-result-title" class="btn btn-ghost">타이틀로</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="js/sprites.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/kirby.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
