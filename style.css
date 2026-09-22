@@ -266,28 +266,81 @@ html, body {
 .taste-2 { background: #ffe4d6; color: #a1451f; }
 .taste-1 { background: #3a2e2e; color: #ffb199; }
 
-/* ---------- Cooking cutscene / heat-control minigame ---------- */
-.cooking-panel { max-width: 560px; }
-.cooking-scene {
+/* ---------- Cooking cutscene / heat-control minigame (full-screen) ---------- */
+.screen.cooking-fullscreen {
+  padding: 0;
+  background: #000;
+}
+.cooking-stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 754 / 505;
-  border-radius: 16px;
+  height: 100%;
   overflow: hidden;
-  margin: 14px 0;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 }
-.cooking-scene img {
+.cooking-stage.shake { animation: cooking-shake 0.4s; }
+@keyframes cooking-shake {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+  40%, 60% { transform: translate3d(8px, 0, 0); }
+}
+
+.cooking-bg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-.cooking-caption {
-  min-height: 1.4em;
-  font-weight: 700;
-  color: #6b6480;
+
+.slice-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.slice-flash-overlay.active { opacity: 0.85; }
+
+.slice-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.slice-canvas.hidden { display: none; }
+
+.cooking-topbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.9);
+  padding: 6px 22px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.cooking-topbar h2 { margin: 0; font-size: 1.1rem; color: var(--pink-deep); }
+
+.cooking-caption-full {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  max-width: 90%;
   margin: 0;
+  padding: 10px 22px;
+  border-radius: 14px;
+  background: rgba(20, 18, 40, 0.6);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  z-index: 2;
 }
 
 .cooking-heat-controls {
@@ -296,8 +349,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  background: rgba(20, 10, 0, 0.25);
+  padding: 70px 20px 84px;
+  background: rgba(20, 10, 0, 0.2);
 }
 .cooking-heat-controls.hidden { display: none; }
 
@@ -305,7 +358,7 @@ html, body {
   position: relative;
   width: 34px;
   height: 100%;
-  max-height: 260px;
+  max-height: 320px;
   background: rgba(255,255,255,0.35);
   border-radius: 17px;
   overflow: hidden;
@@ -410,5 +463,6 @@ body.is-touch .touch-controls:not(.hidden) { display: block; }
   .tc-btn { width: 56px; height: 56px; font-size: 1.25rem; }
   .tc-jump { width: 62px; height: 62px; }
   .title-card, .panel { padding: 18px 20px; }
-  .cooking-scene { height: 28vh; aspect-ratio: auto; }
+  .cooking-topbar h2 { font-size: 0.95rem; }
+  .cooking-caption-full { font-size: 0.9rem; padding: 8px 16px; }
 }

@@ -74,21 +74,21 @@
     </div>
   </section>
 
-  <!-- Time's-up cooking cutscene + heat-control minigame -->
-  <section id="screen-cooking" class="screen overlay">
-    <div class="panel cooking-panel">
-      <h2>시간 종료!</h2>
-      <div class="cooking-scene">
-        <img id="cooking-image" src="assets/cooking/board.jpg" alt="" />
-        <div id="cooking-heat-controls" class="cooking-heat-controls hidden">
-          <div class="heat-gauge">
-            <div class="heat-zone"></div>
-            <div id="heat-needle" class="heat-needle"></div>
-          </div>
-          <button id="cooking-heat-btn" class="btn btn-primary heat-btn">🔥 누르고 있기 (또는 ↑/Space)</button>
+  <!-- Time's-up cooking cutscene + heat-control minigame (full-screen) -->
+  <section id="screen-cooking" class="screen cooking-fullscreen">
+    <div class="cooking-stage">
+      <img id="cooking-image" class="cooking-bg" src="assets/cooking/board.jpg" alt="" />
+      <div id="slice-flash-overlay" class="slice-flash-overlay"></div>
+      <canvas id="slice-canvas" class="slice-canvas hidden"></canvas>
+      <div class="cooking-topbar"><h2>시간 종료!</h2></div>
+      <p id="cooking-caption" class="cooking-caption-full">앗, 시간 종료! 커비가 도마 위에...</p>
+      <div id="cooking-heat-controls" class="cooking-heat-controls hidden">
+        <div class="heat-gauge">
+          <div class="heat-zone"></div>
+          <div id="heat-needle" class="heat-needle"></div>
         </div>
+        <button id="cooking-heat-btn" class="btn btn-primary heat-btn">🔥 누르고 있기 (또는 ↑/Space)</button>
       </div>
-      <p id="cooking-caption" class="cooking-caption">앗, 시간 종료! 커비가 도마 위에...</p>
     </div>
   </section>
 

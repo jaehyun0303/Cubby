@@ -161,19 +161,119 @@ const UI = (() => {
     });
   }
 
+  // Waits for the player to drag a diagonal "slash" across the board scene. Draws the drag as a
+  // glowing trail on a canvas overlaid on the photo; a swipe that's too short or too close to
+  // horizontal/vertical is rejected (with a hint) rather than accepted as a "cut".
+  function runSliceGesture() {
+    return new Promise((resolve) => {
+      const canvas = el('slice-canvas');
+      const hint = el('cooking-caption');
+      const ctx = canvas.getContext('2d');
+      canvas.classList.remove('hidden');
+
+      function resize() {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      let dragging = false;
+      let startX = 0, startY = 0, lastX = 0, lastY = 0;
+
+      function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+      function drawSegment(x1, y1, x2, y2) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.shadowColor = 'rgba(255,255,255,0.9)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      function pointFromEvent(e) {
+        const r = canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+
+      function onDown(e) {
+        dragging = true;
+        clear();
+        const p = pointFromEvent(e);
+        startX = lastX = p.x;
+        startY = lastY = p.y;
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore - up/cancel still fire */ }
+      }
+
+      function onMove(e) {
+        if (!dragging) return;
+        const p = pointFromEvent(e);
+        drawSegment(lastX, lastY, p.x, p.y);
+        lastX = p.x;
+        lastY = p.y;
+      }
+
+      function onUp() {
+        if (!dragging) return;
+        dragging = false;
+        const dx = lastX - startX;
+        const dy = lastY - startY;
+        const dist = Math.hypot(dx, dy);
+        let angle = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI);
+        if (angle > 90) angle = 180 - angle;
+        const minDist = Math.min(canvas.width, canvas.height) * 0.3;
+        const isDiagonal = angle > 25 && angle < 65;
+
+        if (dist >= minDist && isDiagonal) {
+          cleanup();
+          resolve();
+        } else {
+          clear();
+          hint.textContent = '더 길게, 사선(↗ 또는 ↘) 방향으로 쓱 밀어보세요!';
+        }
+      }
+
+      function cleanup() {
+        canvas.removeEventListener('pointerdown', onDown);
+        canvas.removeEventListener('pointermove', onMove);
+        canvas.removeEventListener('pointerup', onUp);
+        canvas.removeEventListener('pointercancel', onUp);
+        window.removeEventListener('resize', resize);
+        canvas.classList.add('hidden');
+      }
+
+      canvas.addEventListener('pointerdown', onDown);
+      canvas.addEventListener('pointermove', onMove);
+      canvas.addEventListener('pointerup', onUp);
+      canvas.addEventListener('pointercancel', onUp);
+    });
+  }
+
   async function runCookingScenes(baseResult) {
     const img = el('cooking-image');
     const caption = el('cooking-caption');
+    const stage = el('cooking-image').parentElement;
+    const flash = el('slice-flash-overlay');
     const heatControls = el('cooking-heat-controls');
     heatControls.classList.add('hidden');
 
     img.src = 'assets/cooking/board.jpg';
-    caption.textContent = '앗, 시간 종료! 커비가 도마 위에 올라갔다...';
-    await wait(1600);
+    caption.textContent = '앗, 시간 종료! 화면을 사선으로 쓱 밀어서 커비를 썰어보세요!';
+    await runSliceGesture();
+
+    flash.classList.add('active');
+    stage.classList.add('shake');
+    await wait(160);
+    flash.classList.remove('active');
+    stage.classList.remove('shake');
 
     img.src = 'assets/cooking/diced.jpg';
     caption.textContent = '숭덩숭덩... 먹기 좋은 크기로 썰렸다!';
-    await wait(1400);
+    await wait(1200);
 
     img.src = 'assets/cooking/pan.jpg';
     caption.textContent = '불 조절이 맛을 좌우한다! 초록 구간을 유지하세요';
