@@ -81,11 +81,15 @@ function generateChunk(mapDef, index) {
     if (Math.random() < 0.7) terrain.push(makeTerrain('crystal', p.x + p.w / 2, p.y));
   }
 
-  if (index >= 2 && Math.random() < mapDef.monsterChance) {
+  // Monsters spawn from the very first chunk (unlike pits, which wait a couple of chunks for a
+  // safe start) and roll twice per chunk, so they show up early and often rather than trickling in.
+  const monsterMinOffset = index === 0 ? 320 : 80; // keep the first ~320px clear so it's not an instant hit
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (Math.random() >= mapDef.monsterChance) continue;
     let mx;
     let tries = 0;
     do {
-      mx = startX + 120 + Math.random() * Math.max(40, mapDef.chunkWidth - 240);
+      mx = startX + monsterMinOffset + Math.random() * Math.max(40, mapDef.chunkWidth - monsterMinOffset - 40);
       tries++;
     } while (inPit(mx) && tries < 6);
     if (!inPit(mx)) {
